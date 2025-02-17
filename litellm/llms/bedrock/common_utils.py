@@ -376,3 +376,37 @@ class BedrockModelInfo(BaseLLMModelInfo):
         elif base_model in litellm.bedrock_converse_models:
             return "converse"
         return "invoke"
+
+
+def process_bedrock_headers(headers: Union[httpx.Headers, dict]) -> dict:
+    """
+    Process Bedrock response headers to match OpenAI format and preserve original headers.
+
+    Args:
+        headers (Union[httpx.Headers, dict]): Response headers from Bedrock
+
+    Returns:
+        dict: Processed headers in OpenAI format with original headers preserved
+    """
+    openai_headers = {}
+
+    # Map token counts to OpenAI format
+    if "x-amzn-bedrock-input-token-count" in headers:
+        openai_headers["x-input-tokens"] = headers["x-amzn-bedrock-input-token-count"]
+    if "x-amzn-bedrock-output-token-count" in headers:
+        openai_headers["x-output-tokens"] = headers["x-amzn-bedrock-output-token-count"]
+    if "x-amzn-RateLimit-Limit" in headers:
+        openai_headers["x-ratelimit-limit-requests"] = headers["x-amzn-RateLimit-Limit"]
+    if "x-amzn-bedrock-invocation-latency" in headers:
+        openai_headers["x-request-latency"] = headers["x-amzn-bedrock-invocation-latency"]
+    if "x-amzn-requestid" in headers:
+        openai_headers["x-request-id"] = headers["x-amzn-requestid"]
+
+    # Preserve original headers with llm_provider prefix
+    llm_response_headers = {
+        "{}-{}".format("llm_provider", k): v
+        for k, v in headers.items()
+    }
+
+    additional_headers = {**llm_response_headers, **openai_headers}
+    return additional_headers

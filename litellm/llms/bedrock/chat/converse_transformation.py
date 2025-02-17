@@ -33,7 +33,7 @@ from litellm.types.llms.openai import (
 from litellm.types.utils import ModelResponse, Usage
 from litellm.utils import add_dummy_tool, has_tool_call_blocks
 
-from ..common_utils import BedrockError, BedrockModelInfo, get_bedrock_tool_name
+from ..common_utils import BedrockError, BedrockModelInfo, get_bedrock_tool_name, process_bedrock_headers
 
 
 class AmazonConverseConfig(BaseConfig):
@@ -211,12 +211,12 @@ class AmazonConverseConfig(BaseConfig):
                     json_schema = value["json_schema"]["schema"]
                     schema_name = value["json_schema"]["name"]
                 """
-                Follow similar approach to anthropic - translate to a single tool call. 
+                Follow similar approach to anthropic - translate to a single tool call.
 
                 When using tools in this way: - https://docs.anthropic.com/en/docs/build-with-claude/tool-use#json-mode
                 - You usually want to provide a single tool
                 - You should set tool_choice (see Forcing tool use) to instruct the model to explicitly use that tool
-                - Remember that the model will pass the input to the tool, so the name of the tool and description should be from the model’s perspective.
+                - Remember that the model will pass the input to the tool, so the name of the tool and description should be from the model's perspective.
                 """
                 _tool_choice = {"name": schema_name, "type": "tool"}
                 _tool = self._create_json_tool_call_for_response_format(
@@ -560,6 +560,10 @@ class AmazonConverseConfig(BaseConfig):
         print_verbose: Optional[Callable],
         encoding,
     ) -> ModelResponse:
+        _hidden_params: Dict = {}
+        _hidden_params["additional_headers"] = process_bedrock_headers(
+            dict(response.headers))
+
         ## LOGGING
         if logging_obj is not None:
             logging_obj.post_call(
@@ -582,11 +586,11 @@ class AmazonConverseConfig(BaseConfig):
             )
 
         """
-        Bedrock Response Object has optional message block 
+        Bedrock Response Object has optional message block
 
         completion_response["output"].get("message", None)
 
-        A message block looks like this (Example 1): 
+        A message block looks like this (Example 1):
         "output": {
             "message": {
                 "role": "assistant",
@@ -681,6 +685,7 @@ class AmazonConverseConfig(BaseConfig):
         if "trace" in completion_response:
             setattr(model_response, "trace", completion_response["trace"])
 
+        model_response._hidden_params = _hidden_params
         return model_response
 
     def get_error_class(

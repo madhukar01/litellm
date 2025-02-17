@@ -19,7 +19,7 @@ from litellm.litellm_core_utils.prompt_templates.factory import (
 )
 from litellm.llms.base_llm.chat.transformation import BaseConfig, BaseLLMException
 from litellm.llms.bedrock.chat.invoke_handler import make_call, make_sync_call
-from litellm.llms.bedrock.common_utils import BedrockError
+from litellm.llms.bedrock.common_utils import BedrockError, process_bedrock_headers
 from litellm.llms.custom_httpx.http_handler import (
     AsyncHTTPHandler,
     HTTPHandler,
@@ -305,6 +305,10 @@ class AmazonInvokeConfig(BaseConfig, BaseAWSLLM):
         json_mode: Optional[bool] = None,
     ) -> ModelResponse:
 
+        _hidden_params: Dict = {}
+        _hidden_params["additional_headers"] = process_bedrock_headers(
+            dict(raw_response.headers)
+        )
         try:
             completion_response = raw_response.json()
         except Exception:
@@ -426,7 +430,7 @@ class AmazonInvokeConfig(BaseConfig, BaseAWSLLM):
             total_tokens=prompt_tokens + completion_tokens,
         )
         setattr(model_response, "usage", usage)
-
+        model_response._hidden_params = _hidden_params
         return model_response
 
     def validate_environment(
